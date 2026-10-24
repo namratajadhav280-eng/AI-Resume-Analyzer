@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Resume Analyzer</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;font-family:Arial,sans-serif;
+  background:#f4f5fb;color:#202344
+}
+header{
+  padding:28px 15px;text-align:center;color:white;
+  background:linear-gradient(135deg,#5b4bdb,#9652e8)
+}
+header h1{margin:0 0 10px;font-size:27px}
+header p{line-height:1.5;margin:0}
+main{max-width:650px;margin:24px auto;padding:0 14px}
+.card{
+  background:white;padding:21px;margin-bottom:20px;
+  border-radius:17px;box-shadow:0 5px 20px #20234410
+}
+h2{font-size:21px;margin-top:0}
+label{display:block;font-weight:bold;margin:17px 0 8px}
+textarea{
+  width:100%;min-height:125px;padding:13px;
+  border:1px solid #d9dbea;border-radius:10px;
+  font:15px Arial,sans-serif;resize:vertical
+}
+button{
+  display:block;width:100%;padding:14px;margin-top:15px;
+  border:0;border-radius:10px;background:#6652df;
+  color:white;font-size:16px;font-weight:bold;cursor:pointer
+}
+button:active{opacity:.8}
+.hint{font-size:13px;color:#686b83;line-height:1.5}
+.hidden{display:none}
+.score{text-align:center;font-size:43px;font-weight:bold;color:#6652df;margin:18px}
+.bar{height:10px;background:#e8e5fa;border-radius:20px;overflow:hidden}
+#progress{height:100%;width:0;background:#6652df}
+.tag{display:inline-block;padding:8px 11px;margin:4px;border-radius:20px;background:#e8f8ee;color:#187a45;font-size:13px}
+.missing{background:#fff0e8;color:#b34e19}
+li{margin-bottom:10px;line-height:1.5}
+footer{text-align:center;padding:20px;color:#777990}
+@media print{
+  header,.input-card,footer,.action-buttons{display:none!important}
+  body{background:white}
+  .card{box-shadow:none;border:1px solid #ddd}
+}
+</style>
+</head>
+
+<body>
+<header>
+  <h1>🤖 AI Resume Analyzer</h1>
+  <p>Analyze your resume. Discover your skills. Improve your career.</p>
+</header>
+
+<main>
+<section class="card input-card">
+  <h2>📄 Analyze Your Resume</h2>
+
+  <label for="resume">Paste Your Resume</label>
+  <textarea id="resume" placeholder="Enter education, skills, projects and experience..."></textarea>
+
+  <label for="job">Target Job Description</label>
+  <textarea id="job" placeholder="Enter job skills and requirements..."></textarea>
+
+  <button type="button" id="analyzeBtn">Analyze Resume ✨</button>
+  <p class="hint">Demo version: keyword matching runs in your browser. No server or AI API is used.</p>
+</section>
+
+<section class="card hidden" id="results">
+  <h2>📊 Analysis Results</h2>
+  <div class="score" id="score">0%</div>
+  <div class="bar"><div id="progress"></div></div>
+  <p id="summary" style="text-align:center"></p>
+
+  <h3>✅ Matching Skills</h3>
+  <div id="matched"></div>
+
+  <h3>🎯 Skills to Improve</h3>
+  <div id="missing"></div>
+
+  <h3>💡 Suggestions</h3>
+  <ul id="suggestions"></ul>
+
+  <div class="action-buttons">
+    <button type="button" id="downloadBtn">Download Report / Save PDF 📄</button>
+    <button type="button" id="copyBtn">Copy Report 📋</button>
+  </div>
+  <p id="message" class="hint" role="status"></p>
+  <textarea id="reportText" class="hidden" readonly></textarea>
+</section>
+</main>
+
+<footer>Built with ❤️ using HTML, CSS & JavaScript</footer>
+
+<script>
+const skills=[
+  "html","css","javascript","python","java","sql","mysql",
+  "react","node.js","excel","communication","teamwork",
+  "problem solving","git","github","machine learning",
+  "data analysis","leadership","project management"
+];
+
+let lastReport=null;
+
+const el=id=>document.getElementById(id);
+
+function analyzeResume(){
+  const resume=el("resume").value.toLowerCase().trim();
+  const job=el("job").value.toLowerCase().trim();
+
+  if(resume.length<20){
+    alert("Please enter your resume first.");
+    el("resume").focus();return;
+  }
+  if(job.length<10){
+    alert("Please enter the Job Description first.");
+    el("job").focus();return;
+  }
+
+  const resumeSkills=skills.filter(s=>resume.includes(s));
+  const jobSkills=skills.filter(s=>job.includes(s));
+  const matched=jobSkills.filter(s=>resumeSkills.includes(s));
+  const missing=jobSkills.filter(s=>!resumeSkills.includes(s));
+  const score=jobSkills.length
+    ?Math.round(matched.length/jobSkills.length*100):0;
+
+  const suggestions=[];
+  if(missing.length) suggestions.push("Improve these job-related skills: "+missing.join(", "));
+  if(!resume.includes("project")) suggestions.push("Add a Projects section with your practical work.");
+  if(!resume.includes("education")) suggestions.push("Include your education and qualifications.");
+  if(!resume.includes("experience")) suggestions.push("Add internships, experience or relevant practical work.");
+  if(!suggestions.length) suggestions.push("Keep your resume clear and tailor it to each job.");
+
+  el("score").textContent=score+"%";
+  el("progress").style.width=score+"%";
+  el("summary").textContent=matched.length+" of "+jobSkills.length+" detected job skills matched.";
+
+  showTags("matched",matched,false);
+  showTags("missing",missing,true);
+
+  el("suggestions").replaceChildren();
+  suggestions.forEach(s=>{
+    const li=document.createElement("li");
+    li.textContent=s;
+    el("suggestions").appendChild(li);
+  });
+
+  lastReport={score,matched,missing,suggestions};
+  el("message").textContent="";
+  el("reportText").classList.add("hidden");
+  el("results").classList.remove("hidden");
+  el("results").scrollIntoView({behavior:"smooth"});
+}
+
+function showTags(id,items,isMissing){
+  const box=el(id);
+  box.replaceChildren();
+  if(!items.length){
+    box.textContent=isMissing?"No missing skills detected.":"No matching skills detected.";
+    return;
+  }
+  items.forEach(s=>{
+    const span=document.createElement("span");
+    span.className=isMissing?"tag missing":"tag";
+    span.textContent=s;
+    box.appendChild(span);
+  });
+}
+
+function makeReport(){
+  const r=lastReport;
+  return [
+    "AI RESUME ANALYZER REPORT",
+    "=========================",
+    "",
+    "Match Score: "+r.score+"%",
+    "",
+    "Matching Skills: "+(r.matched.join(", ")||"None"),
+    "Skills to Improve: "+(r.missing.join(", ")||"None"),
+    "",
+    "Suggestions:",
+    ...r.suggestions.map(s=>"- "+s),
+    "",
+    "Note: This is a keyword-based demo, not an AI hiring assessment."
+  ].join("\n");
+}
+
+function downloadReport(){
+  if(!lastReport){
+    alert("Please analyze your resume first.");return;
+  }
+
+  const report=makeReport();
+  const blob=new Blob([report],{type:"text/plain;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement("a");
+  link.href=url;
+  link.download="AI-Resume-Analysis.txt";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  el("message").textContent=
+    "If the file did not download, use Save PDF below or Copy Report.";
+
+  // Keep the report visible as a fallback.
+  el("reportText").value=report;
+  el("reportText").classList.remove("hidden");
+
+  const old=el("pdfFallback");
+  if(old) old.remove();
+
+  const btn=document.createElement("button");
+  btn.id="pdfFallback";
+  btn.type="button";
+  btn.textContent="Open Report / Save as PDF";
+  btn.onclick=()=>openPrintableReport(report);
+  el("message").after(btn);
+
+  setTimeout(()=>URL.revokeObjectURL(url),10000);
+}
+
+function openPrintableReport(report){
+  const page=window.open("","_blank");
+  if(!page){
+    el("message").textContent=
+      "Popup blocked. Use the report text box below and Copy Report.";
+    el("reportText").classList.remove("hidden");
+    return;
+  }
+
+  const pre=page.document.createElement("pre");
+  pre.textContent=report;
+  pre.style.cssText="white-space:pre-wrap;overflow-wrap:anywhere;font:16px Arial;line-height:1.6;padding:20px";
+  page.document.body.appendChild(pre);
+
+  const btn=page.document.createElement("button");
+  btn.textContent="Print / Save as PDF";
+  btn.style.cssText="padding:12px 18px;margin:20px;font-size:16px";
+  btn.onclick=()=>page.print();
+  page.document.body.prepend(btn);
+  page.document.title="AI Resume Analysis Report";
+}
+
+function copyReport(){
+  if(!lastReport){
+    alert("Please analyze your resume first.");return;
+  }
+
+  const report=makeReport();
+  el("reportText").value=report;
+  el("reportText").classList.remove("hidden");
+  el("reportText").focus();
+  el("reportText").select();
+
+  let copied=false;
+  try{
+    copied=document.execCommand("copy");
+  }catch(e){copied=false;}
+
+  el("message").textContent=copied
+    ?"Report copied! Paste it into Notes."
+    :"Report is shown in the text box. Select and copy it manually.";
+}
+
+el("analyzeBtn").addEventListener("click",analyzeResume);
+el("downloadBtn").addEventListener("click",downloadReport);
+el("copyBtn").addEventListener("click",copyReport);
+</script>
+</body>
+</html>
